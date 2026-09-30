@@ -1,9 +1,12 @@
-<!doctype html><html lang="ko"><head><title>커피 배달 게임 | 프롬프트 구조화 실습</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;background:#efe5d2;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#f4ebd7;overflow:auto}main{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}canvas{width:100%;min-height:0;flex:1;object-fit:contain;display:block}nav{flex-shrink:0;display:flex;justify-content:center;gap:5px;flex-wrap:wrap;padding:9px}button{font:inherit;font-size:12px;border:1px solid #aabbb0;border-radius:3px;background:#f9f4e6;color:#365b50;padding:9px 11px;cursor:pointer;touch-action:none}p{font-size:11px;margin:0 8px 8px;color:#56624a}</style></head><body><main><canvas tabindex="0" aria-label="플레이할 게임"></canvas><nav><button id="start">시작 / 계속</button><button id="pause">잠깐 멈추기</button><button id="reset">처음으로</button><button id="action">커피 받기 / 전하기</button><button data-dir="0,-1" aria-label="위">↑</button><button data-dir="-1,0" aria-label="왼쪽">←</button><button data-dir="0,1" aria-label="아래">↓</button><button data-dir="1,0" aria-label="오른쪽">→</button></nav><p>시작을 누른 뒤 방향키 / WASD로 이동 · E / Space로 배달</p></main><script>/* Dal-dongne Coffee. Original geometry and software 3D renderer. No dependencies. */
+<!doctype html><html lang="ko"><head><title>커피 배달 게임 | 프롬프트 구조화 실습</title><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}body{margin:0;background:#efe5d2;font-family:"Noto Sans KR","Malgun Gothic",sans-serif;color:#f4ebd7;overflow:auto}main{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}canvas{width:100%;min-height:0;flex:1;object-fit:contain;display:block}nav{flex-shrink:0;display:flex;justify-content:center;gap:5px;flex-wrap:wrap;padding:9px}button{font:inherit;font-size:12px;border:1px solid #aabbb0;border-radius:3px;background:#f9f4e6;color:#365b50;padding:9px 11px;cursor:pointer;touch-action:none}p{font-size:16px;line-height:1.55;margin:0 auto 10px;padding:0 16px;max-width:820px;color:#4a2f1c;text-align:center;word-break:keep-all;overflow-wrap:break-word}</style></head><body><main><canvas tabindex="0" aria-label="플레이할 게임"></canvas><nav><button id="start">시작 / 계속</button><button id="pause">잠깐 멈추기</button><button id="reset">처음으로</button><button id="action">커피 받기 / 전하기</button><button data-dir="0,-1" aria-label="앞으로 걷기">↑</button><button data-dir="-1,0" aria-label="왼쪽으로 돌기">←</button><button data-dir="0,1" aria-label="뒤로 걷기">↓</button><button data-dir="1,0" aria-label="오른쪽으로 돌기">→</button></nav><p>① 시작 누르기 → ② ↑↓로 걷고 ←→로 돌기 → ③ 카페에서 E로 커피 받기 → ④ 이웃 앞에서 E로 배달하기</p></main><script>/* Dal-dongne Coffee. Original geometry and software 3D renderer. No dependencies. */
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.Daldongne=api})(typeof globalThis!=='undefined'?globalThis:this,function(){
 'use strict';
-const W=1200,H=800,R=5.5,TAU=Math.PI*2;
+// The town keeps its old layout and sizes, but sits on a ground 100x flatter, so it reads as a plain.
+const W=1200,H=800,FLAT=100,R=5.5*FLAT,TAU=Math.PI*2,A=a=>a/FLAT,GRID=38,CELL=1.35,FAR=17,FAR_CELL=5.4;
 const add=(a,b)=>a.map((v,i)=>v+b[i]),sub=(a,b)=>a.map((v,i)=>v-b[i]),mul=(a,k)=>a.map(v=>v*k),dot=(a,b)=>a.reduce((n,v,i)=>n+v*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=a=>Math.hypot(...a),norm=a=>mul(a,1/(len(a)||1)),clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const at=(lon,lat)=>[Math.sin(lon)*Math.cos(lat),Math.sin(lat),Math.cos(lon)*Math.cos(lat)];
+// A point given in walking units east (x) and north (z) from the town centre.
+const pt=(x,z)=>at(x/R,z/R);
 const angle=(a,b)=>Math.acos(clamp(dot(a,b),-1,1));
 function frame(n){let e=cross([0,1,0],n);if(len(e)<.001)e=cross([0,0,1],n);e=norm(e);return {n,e,u:norm(cross(n,e))}}
 const SITES=[
@@ -16,39 +19,115 @@ const SITES=[
  {id:'home5',lon:.72,lat:-.36,name:'꽃담집',en:'Flower House',type:'hanok',color:'#e4d6b6',roof:'#6d8582',w:1.12,d:.86,h:.69},
  {id:'home1',lon:-1.75,lat:.05,name:'담장집',en:'Garden House',type:'hanok',color:'#e5d4b7',roof:'#53615d',w:1.3,d:1,h:.75},
  {id:'home2',lon:2.82,lat:.56,name:'작은집',en:'Small House',type:'hanok',color:'#dfcfaf',roof:'#555b62',w:1.25,d:.98,h:.74},
- {id:'home3',lon:-2.65,lat:-.61,name:'언덕집',en:'Hill House',type:'hanok',color:'#ead9b6',roof:'#64746a',w:1.2,d:1,h:.75}
-].map(s=>({...s,n:at(s.lon,s.lat),door:at(s.lon,s.lat-.24)}));
+ {id:'home3',lon:-2.65,lat:-.61,name:'언덕집',en:'Hill House',type:'hanok',color:'#ead9b6',roof:'#64746a',w:1.2,d:1,h:.75},
+ {id:'market',lon:-1.45,lat:1.30,name:'새벽시장',en:'Market',type:'shop',color:'#e3d3a6',roof:'#6f8379',w:1.45,d:1,h:.8},
+ {id:'bath',lon:.05,lat:1.45,name:'달빛목욕탕',en:'Bathhouse',type:'shop',color:'#d9e0d2',roof:'#7e8f9b',w:1.4,d:1.05,h:.86},
+ {id:'school',lon:1.55,lat:1.30,name:'작은학교',en:'Little School',type:'hanok',color:'#e8dcbb',roof:'#586a63',w:1.5,d:1.1,h:.84},
+ {id:'tea',lon:2.55,lat:1.35,name:'찻집 두레',en:'Tea House',type:'hanok',color:'#e7d2ad',roof:'#6b6f5e',w:1.25,d:.95,h:.76},
+ {id:'barber',lon:-2.35,lat:.62,name:'동네이발관',en:'Barber',type:'shop',color:'#ded6bb',roof:'#8a9ba2',w:1.2,d:.9,h:.74},
+ {id:'post',lon:-3.10,lat:.75,name:'우체국',en:'Post Office',type:'shop',color:'#e5cfae',roof:'#7c8a80',w:1.3,d:.95,h:.8},
+ {id:'clinic',lon:2.30,lat:-.55,name:'튼튼의원',en:'Clinic',type:'shop',color:'#dfe2cd',roof:'#8b9aa4',w:1.3,d:.95,h:.78},
+ {id:'bakery',lon:-.15,lat:-1.05,name:'해뜰빵집',en:'Bakery',type:'shop',color:'#eddcb4',roof:'#9a7a5e',w:1.3,d:.95,h:.76},
+ {id:'toys',lon:1.35,lat:-1.15,name:'장난감가게',en:'Toy Shop',type:'shop',color:'#e7d0c4',roof:'#79857c',w:1.2,d:.9,h:.74},
+ {id:'bike',lon:-1.85,lat:-1.20,name:'자전거방',en:'Bike Shop',type:'shop',color:'#dcd8bd',roof:'#6d7a74',w:1.2,d:.9,h:.74},
+ {id:'music',lon:1.25,lat:.55,name:'골목음악실',en:'Music Room',type:'hanok',color:'#e6d6b8',roof:'#5f6d68',w:1.15,d:.9,h:.72},
+ {id:'gallery',lon:-1.30,lat:-.20,name:'골목전시관',en:'Gallery',type:'hanok',color:'#e9dcc2',roof:'#707a6c',w:1.25,d:.95,h:.75},
+ {id:'shrine',lon:-2.90,lat:1.25,name:'바람정자',en:'Wind Pavilion',type:'pavilion',color:'#c59870',roof:'#5b675f',w:1.25,d:1,h:.78},
+ {id:'well',lon:3.20,lat:.15,name:'옛우물집',en:'Well House',type:'hanok',color:'#e2d1b0',roof:'#65726b',w:1.15,d:.9,h:.72}
+].map(s=>({...s,n:at(A(s.lon),A(s.lat)),door:at(A(s.lon),A(s.lat-.24))}));
 const ORDERS=SITES.slice(1,5),CAFE=SITES[0];
-function newGame(){const n=at(-.13,-.025);return {n,north:frame(n).u,facing:0,time:0,moving:false,status:'ready',carrying:0,done:[],target:'cafe',locale:'ko',message:'카페 앞에서 커피를 받아 보세요.',messageTime:8,steps:0,round:1};}
+const START=at(A(-.13),A(-.025));
+const rng=seed=>{let v=seed;return()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296}};
+// Tree spots come from their own fixed seed, so the world is the same on every run.
+const TREES=(()=>{const rand=rng(4177),list=[];for(let i=0;i<150;i++){const lon=A((rand()-.5)*8.6),lat=A((rand()-.5)*4.4),n=at(lon,lat);if(angle(n,START)<A(.3)||SITES.some(s=>angle(n,s.n)<A(.27)||angle(n,s.door)<A(.25)))continue;list.push({n,i})}return list})();
+// Second storyline: secret packages ride along with the coffee, police patrol with a 90-degree view.
+const TURN_SPEED=2.2,JOB_CHANCE=.5,POLICE_COUNT=18,POLICE_SPEED=A(.11),VIEW_HALF=Math.PI/4,VIEW_RANGE=A(.42),POINTS={coffee:2,smuggle:5,caught:-10},WIN_SCORE=20;
+// Being seen is not instant: the meter fills while an officer has you in view, faster up close.
+const DETECT_NEAR=.7,DETECT_FAR=.275,DETECT_FADE=.5,POPUP_LIFE=1.8;
+// Pedestrians walk the streets in crowds; standing among HIDE_COUNT of them hides the player from police.
+const CROWD_COUNT=18,SOLO_COUNT=16,HIDE_RADIUS=A(.2),HIDE_COUNT=3;
+const CLOTHES=['#af7869','#8d9675','#a29dab','#b89868','#c28f7a','#7f8f9c','#9b8a6e','#b7a48a'],HAIR=['#675044','#3f352e','#8a6a52','#5a4a40'];
+const STREET=[START,...SITES.map(x=>x.door),at(A(-.65),A(.05)),at(A(-1.12),A(.35)),at(A(1.3),A(.35)),at(A(1.35),0),at(0,A(.3)),at(A(-.6),A(-.8)),at(A(.8),A(-.8)),at(A(2),A(.8)),at(A(-2),A(1)),at(A(-2.7),A(.2)),at(A(2.8),A(-.1))];
+const turn=(n,h,a)=>norm(add(mul(h,Math.cos(a)),mul(cross(n,h),Math.sin(a))));
+const blocked=(n,margin=A(.033))=>SITES.some(b=>angle(n,b.n)<Math.max(b.w,b.d)/(2*R)+margin)||TREES.some(x=>angle(n,x.n)<A(.06)+margin/2);
+const pick=(rand,list)=>list[Math.floor(rand()*list.length)];
+function makePolice(rand){const list=[],anchors=SITES;for(let tries=0;list.length<POLICE_COUNT&&tries<900;tries++){
+ const home=pick(rand,anchors),t=A(.35+rand()*.45),dir=turn(home.n,frame(home.n).e,rand()*TAU),n=norm(add(mul(home.n,Math.cos(t)),mul(dir,Math.sin(t))));
+ if(blocked(n)||angle(n,START)<A(.55)||SITES.some(x=>angle(n,x.door)<A(.4))||list.some(p=>angle(p.n,n)<A(.3)))continue;
+ const h=turn(n,frame(n).e,rand()*TAU);list.push({n,h,look:h,home:home.n,phase:rand()*TAU,turnIn:1+rand()*3,alert:0,speed:A(.07+rand()*.09),sweep:.55+rand()*.5,sweepRate:.8+rand()*.9,roam:A(.6+rand()*.9)});
+}return list}
+function makeCrowds(rand){const list=[];for(let tries=0;list.length<CROWD_COUNT+SOLO_COUNT&&tries<900;tries++){
+ const base=pick(rand,STREET),t=A(rand()*.3),dir=turn(base,frame(base).e,rand()*TAU),n=norm(add(mul(base,Math.cos(t)),mul(dir,Math.sin(t))));
+ if(blocked(n,A(.12))||angle(n,START)<A(.55)||list.some(g=>angle(g.n,n)<A(.22)))continue;
+ // Group sizes and walking speeds vary widely: from a lone walker to a knot of eight.
+ const size=list.length<CROWD_COUNT?2+Math.floor(rand()*7):1,members=[];
+ for(let i=0;i<size;i++){const a=i/size*TAU+rand()*.9,r=size>1?A(.05+rand()*.03*size):0;members.push({dx:Math.cos(a)*r,dz:Math.sin(a)*r,color:pick(rand,CLOTHES),hair:pick(rand,HAIR)})}
+ list.push({n,h:turn(n,frame(n).e,rand()*TAU),home:n,turnIn:.5+rand()*5,speed:A(.03+rand()*(size>1?.05:.1)),margin:size>1?A(.06+.012*size):A(.05),roam:A(.5+rand()*1.6),members});
+}return list}
+function newGame(rand=Math.random){const n=START;return {n,north:frame(n).u,facing:0,time:0,moving:false,status:'ready',carrying:0,done:[],target:'cafe',locale:'ko',message:'카페 앞에서 커피를 받아 보세요.',messageTime:8,steps:0,round:1,score:0,contraband:null,offerLeg:-1,smuggled:0,caught:0,hidden:false,detect:0,spotter:null,popups:[],rand,police:makePolice(rand),crowds:makeCrowds(rand)};}
+function offerJob(s){if(s.rand()<JOB_CHANCE){s.contraband={to:s.target};const d=target(s);announce(s,'컵홀더 아래 비밀 꾸러미 하나… '+(s.locale==='ko'?d.name:d.en)+'에 몰래 전해요.');return true}return false}
+function sees(p,n){const d=angle(p.n,n);if(d<A(.06))return true;if(d>VIEW_RANGE)return false;return angle(norm(sub(n,mul(p.n,dot(n,p.n)))),p.look)<=VIEW_HALF}
+function walkers(s){const out=[];for(const g of s.crowds){const f=frame(g.n);for(const m of g.members)out.push({n:norm(add(g.n,add(mul(f.e,m.dx),mul(f.u,m.dz)))),look:g.h,color:m.color,hair:m.hair})}return out}
+function isHidden(s){return walkers(s).filter(w=>angle(w.n,s.n)<HIDE_RADIUS).length>=HIDE_COUNT}
+// Police and pedestrians share one wandering rule: drift, turn now and then, stay near home, avoid buildings.
+function wander(s,a,dt,speed,margin=A(.033)){
+ a.turnIn-=dt;if(a.turnIn<=0){a.h=turn(a.n,a.h,(s.rand()-.5)*Math.PI*1.9);a.turnIn=.6+s.rand()*5}
+ if(angle(a.n,a.home)>(a.roam||A(.9))){const back=sub(a.home,mul(a.n,dot(a.home,a.n)));if(len(back)>1e-6)a.h=norm(back)}
+ const next=norm(add(a.n,mul(a.h,dt*speed)));
+ if(blocked(next,margin))a.h=turn(a.n,a.h,Math.PI*(.6+s.rand()*.8));else{a.n=next;a.h=norm(sub(a.h,mul(next,dot(a.h,next))))}
+}
+function updatePolice(s,dt){for(const p of s.police){wander(s,p,dt,p.speed||POLICE_SPEED);p.look=turn(p.n,p.h,Math.sin(s.time*(p.sweepRate||1.2)+p.phase)*(p.sweep||.85));p.alert=Math.max(0,p.alert-dt)}}
+function updateCrowds(s,dt){for(const g of s.crowds)wander(s,g,dt,g.speed,g.margin)}
 function start(s){if(s.status==='ready'||s.status==='paused')s.status='playing'}
 function pause(s){if(s.status==='playing')s.status='paused';else if(s.status==='paused')s.status='playing'}
 function target(s){return SITES.find(x=>x.id===s.target)||CAFE}
-function nearest(s){const a=[CAFE,...ORDERS].map(site=>({site,d:angle(s.n,site.door)})).sort((a,b)=>a.d-b.d)[0];return a.d<.205?a.site:null}
+function nearest(s){const a=[CAFE,...ORDERS].map(site=>({site,d:angle(s.n,site.door)})).sort((a,b)=>a.d-b.d)[0];return a.d<A(.205)?a.site:null}
 function announce(s,m){s.message=m;s.messageTime=5}
+// A score change rises at the top middle of the view, where the player is already looking.
+function popup(s,text,color){s.popups.push({text,color,born:s.time});if(s.popups.length>4)s.popups.shift()}
 function interact(s){
  if(s.status!=='playing')return false;const site=nearest(s);
  if(!site){announce(s,'안내 화살표를 따라 이웃 앞으로 다가가세요.');return false}
  if(site.id==='cafe'){
-  if(s.carrying){announce(s,'커피가 준비됐어요. 이웃에게 전해 주세요.');return false}
-  if(s.done.length===4)return false;
-  s.carrying=4-s.done.length;s.target=ORDERS.find(x=>!s.done.includes(x.id)).id;announce(s,'따뜻한 마음 네 잔, 배달을 시작해요.');return true;
+  if(s.carrying){
+   // Coming back between deliveries lets the barista offer one new secret job per leg.
+   if(s.contraband){announce(s,'이미 비밀 꾸러미를 들고 있어요. 먼저 전해 주세요.');return false}
+   if(s.offerLeg===s.done.length){announce(s,'커피가 준비됐어요. 이웃에게 전해 주세요.');return false}
+   s.offerLeg=s.done.length;if(offerJob(s))return true;announce(s,'“지금은 맡길 게 없어요.” 바리스타가 고개를 저어요.');return false;
+  }
+  s.carrying=4-s.done.length;s.target=ORDERS.find(x=>!s.done.includes(x.id)).id;s.offerLeg=s.done.length;
+  if(!offerJob(s))announce(s,'따뜻한 마음 네 잔, 배달을 시작해요.');return true;
  }
  if(s.done.includes(site.id)){announce(s,'이미 배달했어요. 다음 이웃을 찾아보세요.');return false}
  if(!s.carrying){s.target='cafe';announce(s,'먼저 카페에서 커피를 받아 주세요.');return false}
- s.carrying--;s.done.push(site.id);announce(s,site.neighbor+' · “고마워요! 좋은 하루 보내요.”');
- if(s.done.length===4){s.status='won';s.target='cafe';announce(s,'네 이웃에게 모두 전했어요. 오늘도 좋은 하루!')}
- else s.target=ORDERS.find(x=>!s.done.includes(x.id)).id;
+ s.carrying--;s.done.push(site.id);
+ if(s.contraband&&s.contraband.to===site.id){s.contraband=null;s.smuggled++;s.score+=POINTS.smuggle;s.detect=0;announce(s,site.neighbor+' · “…꾸러미도 잘 받았어요.”  +'+POINTS.smuggle+'점');popup(s,'+'+POINTS.smuggle,'#3f7a55')}
+ else{s.score+=POINTS.coffee;announce(s,site.neighbor+' · “고마워요! 좋은 하루 보내요.”  +'+POINTS.coffee+'점');popup(s,'+'+POINTS.coffee,'#3f6151')}
+ if(s.score>=WIN_SCORE){s.status='won';s.target='cafe';s.contraband=null;announce(s,'목표 '+WIN_SCORE+'점 달성! 최종 점수 '+s.score+'점')}
+ else if(s.done.length===4){s.done=[];s.carrying=0;s.contraband=null;s.offerLeg=-1;s.round++;s.target='cafe';announce(s,'새 주문이 들어왔어요 ('+s.round+'회차). 카페로 돌아가세요.')}
+ else s.target=s.contraband?s.contraband.to:ORDERS.find(x=>!s.done.includes(x.id)).id;
  return true;
 }
 function step(s,dt,input={}){
  if(s.status!=='playing')return;dt=clamp(dt,0,.05);s.time+=dt;s.messageTime=Math.max(0,s.messageTime-dt);
- let x=input.x||0,y=input.y||0;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}s.moving=!!(x||y);
- if(!s.moving)return;
- const east=norm(cross(s.north,s.n)),v=add(mul(east,x),mul(s.north,-y)),next=norm(add(s.n,mul(v,dt*.37)));
- if(!SITES.some(b=>angle(next,b.n)<Math.max(b.w,b.d)/(2*R)+.033)){
-  s.n=next;s.north=norm(sub(s.north,mul(next,dot(s.north,next))));s.facing=Math.atan2(x,-y);s.steps+=dt*3;
+ // First person: left/right turns the view, up/down walks along it. s.north is where the player faces.
+ const x=clamp(input.x||0,-1,1),y=clamp(input.y||0,-1,1);s.moving=!!y;
+ if(x)s.north=turn(s.n,s.north,-x*dt*TURN_SPEED);
+ if(y){const next=norm(add(s.n,mul(s.north,-y*dt*A(.37))));
+  if(!blocked(next)){s.n=next;s.north=norm(sub(s.north,mul(next,dot(s.north,next))));s.steps+=dt*3}
+ }
+ updatePolice(s,dt);updateCrowds(s,dt);s.hidden=isHidden(s);
+ s.popups=s.popups.filter(p=>s.time-p.born<POPUP_LIFE);
+ // The meter fills only while an officer actually has the carrying player in view.
+ const cop=s.contraband&&!s.hidden?s.police.find(p=>sees(p,s.n)):null;s.spotter=cop;
+ if(cop){s.detect=Math.min(1,s.detect+dt*(DETECT_NEAR-(DETECT_NEAR-DETECT_FAR)*clamp(angle(cop.n,s.n)/VIEW_RANGE,0,1)));if(s.detect<1)announce(s,'경찰이 이쪽을 보고 있어요! 시야에서 벗어나거나 사람들 틈에 숨으세요.')}
+ else s.detect=Math.max(0,s.detect-dt*DETECT_FADE);
+ if(cop&&s.detect>=1){
+  cop.alert=2;s.contraband=null;s.caught++;s.score+=POINTS.caught;s.detect=0;s.spotter=null;s.target=ORDERS.find(x=>!s.done.includes(x.id)).id;
+  announce(s,'경찰에게 붙잡혔어요! 꾸러미를 압수당했어요.  '+POINTS.caught+'점');popup(s,String(POINTS.caught),'#7a3b3b');
  }
 }
+function look(s,radians){if(s.status==='playing')s.north=turn(s.n,s.north,-radians)}
 function chooseTarget(s,id){if(id==='cafe'||ORDERS.some(o=>o.id===id&&!s.done.includes(id)))s.target=id}
 // Geometry in true three-dimensional world coordinates. Canvas is the raster target.
 const LIGHT=norm([-1,2,3]);
@@ -56,20 +135,30 @@ function shade(hex,k){const a=hex.slice(1).match(/../g).map(x=>parseInt(x,16));r
 let sceneCache={};
 function makeScene(locale){
  const korean=locale==='ko',polys=[],labels=[];let currentLayer=0;
- const poly=(pts,color,lit=true)=>{let k=1;if(lit){const n=norm(cross(sub(pts[1],pts[0]),sub(pts[2],pts[0])));k=.77+.23*Math.abs(dot(n,LIGHT))}polys.push({pts,color:shade(color,k),layer:currentLayer})};
+ // Centres are stored with each face: the draw loop tests thousands of them every frame.
+ const poly=(pts,color,lit=true)=>{let k=1;if(lit){const n=norm(cross(sub(pts[1],pts[0]),sub(pts[2],pts[0])));k=.77+.23*Math.abs(dot(n,LIGHT))}const c=mul(pts.reduce(add,[0,0,0]),1/pts.length);polys.push({pts,color:shade(color,k),layer:currentLayer,c,cn:norm(c)})};
  function local(n,fn){const f=frame(n);return fn((x,y,z)=>add(mul(n,R+y),add(mul(f.e,x),mul(f.u,z))))}
  function box(p,x,y,z,w,h,d,color){const q=[p(x-w/2,y,z-d/2),p(x+w/2,y,z-d/2),p(x+w/2,y+h,z-d/2),p(x-w/2,y+h,z-d/2),p(x-w/2,y,z+d/2),p(x+w/2,y,z+d/2),p(x+w/2,y+h,z+d/2),p(x-w/2,y+h,z+d/2)];[[0,1,2,3],[1,5,6,2],[4,7,6,5],[0,3,7,4],[3,2,6,7]].forEach(ids=>poly(ids.map(i=>q[i]),color))}
  function ball(center,r,color,sx=1,sy=1,sz=1,seg=8,rings=5){for(let j=0;j<rings;j++)for(let i=0;i<seg;i++){let v=[];for(const [a,b]of[[i,j],[i+1,j],[i+1,j+1],[i,j+1]]){const n=at(a/seg*TAU,-Math.PI/2+b/rings*Math.PI);v.push(add(center,[n[0]*r*sx,n[1]*r*sy,n[2]*r*sz]))}poly(v,color)}}
  function roof(p,w,d,y,color,hip=true){const e=.17;const q=[p(-w/2-e,y,-d/2-e),p(w/2+e,y,-d/2-e),p(w/2+e,y,d/2+e),p(-w/2-e,y,d/2+e)];const ridge=[p(-w*.22,y+.42,0),p(w*.22,y+.42,0)];poly([q[0],q[1],ridge[1],ridge[0]],color);poly([q[3],ridge[0],ridge[1],q[2]],color);poly([q[0],ridge[0],q[3]],color);poly([q[1],q[2],ridge[1]],color);box(p,0,y-.07,0,w+.33,.075,d+.33,shade(color,.78));if(hip){for(let i=0;i<12;i++){const x=-w*.56+i*w*1.12/11;const endx=clamp(x,-w*.22,w*.22);poly([p(x-.017,y+.009,-d/2-e),p(x+.017,y+.009,-d/2-e),p(endx+.014,y+.429,0),p(endx-.014,y+.429,0)],shade(color,1.25),false)}box(p,0,y+.4,0,w*.52,.075,.09,shade(color,1.2))}}
  // The triangulated globe provides both the curved horizon and foreground occlusion.
- const rng=seed=>{let v=seed;return()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296}},rand=rng(531);
- for(let j=0;j<24;j++)for(let i=0;i<48;i++){const a=i/48*TAU,b=-Math.PI/2+j/24*Math.PI;const v=[at(a,b),at(a+TAU/48,b),at(a+TAU/48,b+Math.PI/24),at(a,b+Math.PI/24)].map(n=>mul(n,R));const color=shade(korean?'#b9c998':'#b9cbb0',.98+rand()*.035);poly([v[0],v[1],v[2]],color);poly([v[0],v[2],v[3]],color)}
+ const rand=rng(531);
+ // Flat ground: a grid of tiles under the town, and coarser tiles carrying the plain out to the horizon.
+ const tile=(x,z,w)=>{const v=[pt(x,z),pt(x+w,z),pt(x+w,z+w),pt(x,z+w)].map(n=>mul(n,R));const color=shade(korean?'#b9c998':'#b9cbb0',.98+rand()*.035);poly([v[0],v[1],v[2]],color);poly([v[0],v[2],v[3]],color)};
+ for(let j=0;j<GRID;j++)for(let i=0;i<GRID;i++)tile((i-GRID/2)*CELL,(j-GRID/2)*CELL,CELL);
+ const inner=GRID*CELL/2;
+ for(let j=0;j<FAR;j++)for(let i=0;i<FAR;i++){const x=(i-FAR/2)*FAR_CELL,z=(j-FAR/2)*FAR_CELL;if(x>=-inner&&x+FAR_CELL<=inner&&z>=-inner&&z+FAR_CELL<=inner)continue;tile(x,z,FAR_CELL)}
  currentLayer=1;
- function road(a,b,width=.13,color='#e9d7b2'){const count=Math.ceil(angle(a,b)*45);for(let i=0;i<count;i++){const n1=norm(add(mul(a,1-i/count),mul(b,i/count))),n2=norm(add(mul(a,1-(i+1)/count),mul(b,(i+1)/count))),side=norm(cross(n1,n2));poly([add(mul(n1,R+.025),mul(side,-width)),add(mul(n1,R+.025),mul(side,width)),add(mul(n2,R+.025),mul(side,width)),add(mul(n2,R+.025),mul(side,-width))],color,false)}}
- const routes=[[CAFE.door,ORDERS[0].door],[CAFE.door,at(-.65,.05),at(-1.12,.35),at(-1.15,.58),ORDERS[1].door],[ORDERS[1].door,ORDERS[2].door],[ORDERS[2].door,at(1.3,.35),at(1.35,0),at(1.4,-.35),ORDERS[3].door]];for(const route of routes)for(let i=1;i<route.length;i++)road(route[i-1],route[i],.16);
- road(CAFE.door,at(-.13,-.025),.2);road(SITES.find(x=>x.id==='home4').door,CAFE.door,.14);road(SITES.find(x=>x.id==='home5').door,ORDERS[0].door,.14);road(SITES.find(x=>x.id==='home2').door,SITES.find(x=>x.id==='home3').door,.14);
- // A narrow stream wraps the lower part of the world.
- for(let i=0;i<80;i++){const a=i/80*TAU,b=(i+1)/80*TAU;road(at(a,-.72+Math.sin(a*3)*.1),at(b,-.72+Math.sin(b*3)*.1),.18,'#87b7b1')}
+ function road(a,b,width=.13,color='#e9d7b2'){const count=Math.ceil(angle(a,b)*R*4)+1;for(let i=0;i<count;i++){const n1=norm(add(mul(a,1-i/count),mul(b,i/count))),n2=norm(add(mul(a,1-(i+1)/count),mul(b,(i+1)/count))),side=norm(cross(n1,n2));poly([add(mul(n1,R+.025),mul(side,-width)),add(mul(n1,R+.025),mul(side,width)),add(mul(n2,R+.025),mul(side,width)),add(mul(n2,R+.025),mul(side,-width))],color,false)}}
+ const routes=[[CAFE.door,ORDERS[0].door],[CAFE.door,at(A(-.65),A(.05)),at(A(-1.12),A(.35)),at(A(-1.15),A(.58)),ORDERS[1].door],[ORDERS[1].door,ORDERS[2].door],[ORDERS[2].door,at(A(1.3),A(.35)),at(A(1.35),0),at(A(1.4),A(-.35)),ORDERS[3].door]];for(const route of routes)for(let i=1;i<route.length;i++)road(route[i-1],route[i],.16);
+ const site=id=>SITES.find(x=>x.id===id);
+ road(CAFE.door,START,.2);road(site('home4').door,CAFE.door,.14);road(site('home5').door,ORDERS[0].door,.14);road(site('home2').door,site('home3').door,.14);
+ // Lanes out to the newer quarters of the town.
+ const lanes=[['store','market'],['market','bath'],['bath','school'],['school','tea'],['tea','home2'],['store','barber'],['barber','post'],['post','shrine'],['shrine','market'],['pavilion','clinic'],['clinic','well'],['well','home2'],['books','music'],['music','school'],['cafe','gallery'],['gallery','bike'],['bike','home3'],['home4','bakery'],['bakery','toys'],['toys','clinic'],['bakery','home5']];
+ for(const [a,b] of lanes)road(site(a).door,site(b).door,.14);
+ // A narrow stream runs east to west across the southern edge of the plain.
+ const creek=x=>pt(x,-4+Math.sin(x*.22)*1.4);
+ for(let i=0;i<70;i++)road(creek(-34+i),creek(-33+i),.18,'#87b7b1');
  currentLayer=2;
  for(const s of SITES)local(s.n,p=>{
   box(p,0,.01,0,s.w+.22,.11,s.d+.18,'#a59f83');
@@ -92,10 +181,8 @@ function makeScene(locale){
   if(korean&&s.type!=='pavilion'){ball(p(s.w*.6,.24,.26),.18,'#8a624c',1,1.25,1);box(p,s.w*.6,.44,.26,.22,.035,.22,'#725442');ball(p(s.w*.69,.16,-.06),.12,'#a77856');}
  });
  // Courtyard trees: blossom trees and rounded pines. Fixed seed, reproducible world.
- for(let i=0;i<53;i++){
-  const lon=(rand()-.5)*TAU,lat=Math.asin((rand()-.5)*1.85),n=at(lon,lat);
-  if(angle(n,at(-.13,-.025))<.3||SITES.some(s=>angle(n,s.n)<.27||angle(n,s.door)<.25))continue;
-  local(n,p=>{box(p,0,.02,0,.065,.47,.065,'#8d7759');const blossom=korean&&i%4===0;ball(p(0,.70,0),.32,blossom?'#efc4b6':'#7d9d74',1,1.2,1);ball(p(.17,.56,.07),.24,blossom?'#f2d0be':'#98b17d');});
+ for(const {n,i} of TREES){
+  local(n,p=>{box(p,0,.02,0,.065,.47,.065,'#8d7759');const blossom=korean&&i%4===0;ball(p(0,.70,0),.32,blossom?'#efc4b6':'#7d9d74',1,1.2,1,6,4);ball(p(.17,.56,.07),.24,blossom?'#f2d0be':'#98b17d',1,1,1,5,3);});
  }
  // A low garden wall, bench, small tiled gate, lanterns and a laundry line.
  local(at(-.65,.14),p=>{for(let i=0;i<5;i++){box(p,(i-2)*.20,0,0,.185,.29,.13,'#b7ae94');box(p,(i-2)*.20,.29,0,.21,.06,.16,'#67756b')}});
@@ -104,52 +191,111 @@ function makeScene(locale){
  // Original town props; no source project artwork is embedded.
  return {polys,labels,ball,box,local,poly};
 }
-function camera(s){const eye=mul(norm(add(s.n,mul(s.north,.26))),18.9),f=norm(mul(eye,-1)),right=norm(cross(f,s.north)),up=norm(cross(right,f));return {eye,f,right,up,project(v){const d=sub(v,eye),z=dot(d,f);return {x:W/2+dot(d,right)*980/z,y:433-dot(d,up)*980/z,z}},eyeN:norm(eye)}}
+// First-person camera at eye height, tilted slightly down. Polygons are clipped at a near plane.
+const EYE=.56,FOCAL=620,CY=380,NEAR=.04,PITCH=.1,SIGHT=Math.cos(A(3.4)),NEAR_SIGHT=A(3.2);
+function camera(s){const bob=s.moving?Math.sin(s.steps*TAU)*.012:0,eye=mul(s.n,R+EYE+bob),f=norm(sub(mul(s.north,Math.cos(PITCH)),mul(s.n,Math.sin(PITCH)))),right=norm(cross(f,s.n)),up=cross(right,f);
+ const view=v=>{const d=sub(v,eye);return {x:dot(d,right),y:dot(d,up),z:dot(d,f)}},screen=v=>({x:W/2+v.x*FOCAL/v.z,y:CY-v.y*FOCAL/v.z,z:v.z});
+ return {eye,f,right,up,eyeN:s.n,view,screen,project:v=>screen(view(v))}}
+function clipNear(vs){const out=[];for(let i=0;i<vs.length;i++){const a=vs[i],b=vs[(i+1)%vs.length],ain=a.z>=NEAR,bin=b.z>=NEAR;if(ain)out.push(a);if(ain!==bin){const k=(NEAR-a.z)/(b.z-a.z);out.push({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k,z:NEAR})}}return out}
 function draw(c,s,{overlay=true}={}){
  const scene=sceneCache[s.locale]||(sceneCache[s.locale]=makeScene(s.locale));const cam=camera(s);c.save();c.clearRect(0,0,W,H);
  const bg=c.createLinearGradient(0,0,0,H);bg.addColorStop(0,'#eadac2');bg.addColorStop(1,'#f6eddc');c.fillStyle=bg;c.fillRect(0,0,W,H);
- c.fillStyle='#d9cbb344';c.beginPath();c.ellipse(W/2,737,230,25,0,0,TAU);c.fill();
- let polys=scene.polys.slice(),labels=scene.labels.slice();
- function dynPoly(pts,color){polys.push({pts,color,layer:2})}
- function ball(center,r,color,sx=1,sy=1,sz=1){for(let j=0;j<5;j++)for(let i=0;i<8;i++){const pts=[];for(const[a,b]of[[i,j],[i+1,j],[i+1,j+1],[i,j+1]]){let n=at(a/8*TAU,-Math.PI/2+b/5*Math.PI);pts.push(add(center,[n[0]*r*sx,n[1]*r*sy,n[2]*r*sz]))}const n=norm(cross(sub(pts[1],pts[0]),sub(pts[2],pts[0])));dynPoly(pts,shade(color,.82+.18*Math.abs(dot(n,LIGHT))))}}
- function person(n,isPlayer,color){const f=isPlayer?{n,e:norm(cross(s.north,n)),u:s.north}:frame(n),bob=isPlayer&&s.moving?Math.sin(s.steps*TAU)*.02:0;
+ let polys=scene.polys.slice(),labels=scene.labels.slice(),layerOut=2;
+ function dynPoly(pts,color){polys.push({pts,color,layer:layerOut})}
+ // Background people (police, pedestrians) use coarser spheres so dozens of them stay smooth.
+ let seg=8,rings=5;
+ function ball(center,r,color,sx=1,sy=1,sz=1){for(let j=0;j<rings;j++)for(let i=0;i<seg;i++){const pts=[];for(const[a,b]of[[i,j],[i+1,j],[i+1,j+1],[i,j+1]]){let n=at(a/seg*TAU,-Math.PI/2+b/rings*Math.PI);pts.push(add(center,[n[0]*r*sx,n[1]*r*sy,n[2]*r*sz]))}const n=norm(cross(sub(pts[1],pts[0]),sub(pts[2],pts[0])));dynPoly(pts,shade(color,.82+.18*Math.abs(dot(n,LIGHT))))}}
+ function person(n,isPlayer,color,look,hair='#675044'){const away=angle(n,s.n);if(away>NEAR_SIGHT||dot(sub(mul(n,R),cam.eye),cam.f)<-.8)return;const crowd=!!look,far=away>A(.8),tiny=away>A(1.7);seg=crowd?(tiny?4:far?5:6):8;rings=crowd?(tiny?2:far?2:3):5;const back=look&&mul(look,-1),f=isPlayer?{n,e:norm(cross(s.north,n)),u:s.north}:look?{n,e:norm(cross(back,n)),u:back}:frame(n),bob=isPlayer&&s.moving?Math.sin(s.steps*TAU)*.02:0;
   const pos=(x,y,z)=>add(mul(n,R+y+bob),add(mul(f.e,x),mul(f.u,z)));
   ball(pos(0,.24,0),.17,color,1,1.5,.8);ball(pos(0,.53,0),.19,'#d7a576',1,1.07,.95);
-  ball(pos(0,.68,.015),.145,'#675044',1,.55,1);
-  // Faces look toward the southern walking direction; visible from the follow camera.
-  ball(pos(-.061,.555,-.169),.025,'#3a4035');ball(pos(.061,.555,-.169),.025,'#3a4035');
-  ball(pos(-.115,.47,-.14),.031,'#d88872',1,.6,.4);ball(pos(.115,.47,-.14),.031,'#d88872',1,.6,.4);
+  if(hair==='police'){ball(pos(0,.7,0),.16,'#2f3d57',1,.5,1);ball(pos(0,.665,-.13),.09,'#26314a',1,.25,.8);ball(pos(0,.35,-.14),.03,'#e3c35a')}
+  else ball(pos(0,.68,.015),.145,hair,1,.55,1);
+  if(isPlayer&&s.contraband)ball(pos(0,.36,.17),.11,'#6b4a3a',1.1,.9,.8);
+  // Faces look toward the walking direction. Distant walkers skip the small details.
+  if(!far){ball(pos(-.061,.555,-.169),.025,'#3a4035');ball(pos(.061,.555,-.169),.025,'#3a4035')}
+  if(!crowd){ball(pos(-.115,.47,-.14),.031,'#d88872',1,.6,.4);ball(pos(.115,.47,-.14),.031,'#d88872',1,.6,.4);}
   const walk=isPlayer&&s.moving?Math.sin(s.steps*TAU)*.065:0;
   ball(pos(-.09,.066,walk),.073,'#574e42',.75,.8,1.45);ball(pos(.09,.066,-walk),.073,'#574e42',.75,.8,1.45);
-  ball(pos(-.195,.28,-.07),.067,'#d7a576',.7,1,1);ball(pos(.195,.28,-.07),.067,'#d7a576',.7,1,1);
+  if(!far){ball(pos(-.195,.28,-.07),.067,'#d7a576',.7,1,1);ball(pos(.195,.28,-.07),.067,'#d7a576',.7,1,1)}
   if(isPlayer&&s.carrying){
    dynPoly([pos(-.20,.29,-.13),pos(.20,.29,-.13),pos(.20,.29,-.46),pos(-.20,.29,-.46)],'#966f4e');
    for(let i=0;i<s.carrying;i++){const x=(i%2-.5)*.16,z=-.23-Math.floor(i/2)*.16;const base=pos(x,.3,z),top=pos(x,.435,z);for(let a=0;a<8;a++){const k=a/8*TAU,k2=(a+1)/8*TAU;dynPoly([add(base,add(mul(f.e,Math.cos(k)*.048),mul(f.u,Math.sin(k)*.048))),add(base,add(mul(f.e,Math.cos(k2)*.048),mul(f.u,Math.sin(k2)*.048))),add(top,add(mul(f.e,Math.cos(k2)*.058),mul(f.u,Math.sin(k2)*.058))),add(top,add(mul(f.e,Math.cos(k)*.058),mul(f.u,Math.sin(k)*.058)))],a%2?'#f0e7d1':'#e0d2b2')};ball(pos(x,.446,z),.058,'#805a40',1,.17,1)}
   }
  }
  for(const o of ORDERS){person(o.door,false,s.done.includes(o.id)?'#829b75':['#af7869','#8d9675','#a29dab','#b89868'][ORDERS.indexOf(o)]);if(!s.done.includes(o.id))labels.push({pos:mul(o.door,R+1.03),text:'·',kind:'pin',n:o.door,id:o.id});}
- person(s.n,true,'#467f76');
+ // Police: a translucent 90-degree fan on the ground shows where each officer is looking.
+ for(const p of s.police){
+  const k=p.alert>0?1:p===s.spotter?s.detect:0,fill=k>0?'rgba('+Math.round(238-30*k)+','+Math.round(197-109*k)+','+Math.round(90-16*k)+','+(.5+.03*k)+')':'#eec55a80',ray=a=>{const d=turn(p.n,p.look,a);return mul(norm(add(mul(p.n,Math.cos(VIEW_RANGE)),mul(d,Math.sin(VIEW_RANGE)))),R+.035)},tip=mul(p.n,R+.035);
+  if(angle(p.n,s.n)<A(3.5))for(let i=0;i<8;i++)polys.push({pts:[tip,ray(-VIEW_HALF+i*VIEW_HALF/4),ray(-VIEW_HALF+(i+1)*VIEW_HALF/4)],color:fill,layer:1.5});
+  person(p.n,false,'#3f5476',p.look,'police');
+ }
+ for(const w of walkers(s))person(w.n,false,w.color,w.look,w.hair);
+ if(s.contraband){const d=target(s);labels.push({pos:mul(d.door,R+1.6),kind:'secret',n:d.door})}
  labels.push({pos:mul(CAFE.door,R+.85),text:'☕',kind:'pin',n:CAFE.door,id:'cafe'});
- const faces=[];for(const p of polys){const center=mul(p.pts.reduce(add,[0,0,0]),1/p.pts.length);if(dot(norm(center),cam.eyeN)<(p.layer===0?-.05:.29))continue;const pts=p.pts.map(cam.project);if(pts.some(p=>p.z<=.1))continue;faces.push({pts,color:p.color,layer:p.layer,z:pts.reduce((a,p)=>a+p.z,0)/pts.length})}faces.sort((a,b)=>a.layer-b.layer||b.z-a.z);
+ // What the player holds: a tray of cups (and the secret package) at the bottom of the view.
+ const east=norm(cross(s.north,s.n)),hb=s.moving?Math.sin(s.steps*TAU)*.012:0,hp=(x,y,z)=>add(mul(s.n,R+y+hb),add(mul(east,x),mul(s.north,z)));
+ if(s.carrying){
+  layerOut=3;seg=8;rings=5;
+  dynPoly([hp(-.13,.17,.5),hp(.13,.17,.5),hp(.13,.17,.72),hp(-.13,.17,.72)],'#966f4e');
+  ball(hp(-.15,.16,.54),.035,'#d7a576',1,.8,1.3);ball(hp(.15,.16,.54),.035,'#d7a576',1,.8,1.3);
+  for(let i=0;i<s.carrying;i++){const x=(i%2-.5)*.09,z=.57+Math.floor(i/2)*.09,base=hp(x,.175,z),top=hp(x,.245,z),ring=(o,k,r)=>add(o,add(mul(east,Math.cos(k)*r),mul(s.north,Math.sin(k)*r)));
+   for(let a=0;a<8;a++){const k=a/8*TAU,k2=(a+1)/8*TAU;dynPoly([ring(base,k,.026),ring(base,k2,.026),ring(top,k2,.032),ring(top,k,.032)],a%2?'#f0e7d1':'#e0d2b2')}
+   dynPoly(Array.from({length:8},(_,a)=>ring(hp(x,.25,z),a/8*TAU,.032)),'#805a40')}
+  if(s.contraband)ball(hp(.075,.21,.69),.045,'#6b4a3a',1.2,.8,1);
+  layerOut=2;
+ }
+ const faces=[];for(const p of polys){
+  const center=p.c||mul(p.pts.reduce(add,[0,0,0]),1/p.pts.length);
+  if(p.layer<3){
+   const cn=p.cn||norm(center);
+   // Ground and road tiles lie flat, so the ones facing away from the eye are the ones past the horizon.
+   if(p.layer<2){if(dot(cn,sub(cam.eye,center))<=0)continue}
+   else if(dot(cn,s.n)<SIGHT)continue;
+  }
+  const v=clipNear(p.pts.map(cam.view));if(v.length<3)continue;
+  const d=sub(center,cam.eye);faces.push({pts:v.map(cam.screen),color:p.color,layer:p.layer,z:dot(d,d)});
+ }
+ faces.sort((a,b)=>a.layer-b.layer||b.z-a.z);
  for(const p of faces){c.fillStyle=p.color;c.beginPath();p.pts.forEach((v,i)=>i?c.lineTo(v.x,v.y):c.moveTo(v.x,v.y));c.closePath();c.fill();if(p.layer===0){c.strokeStyle=p.color;c.lineWidth=.65;c.stroke()}}
- // Only front-facing labels remain legible above their own buildings.
- for(const l of labels){if(dot(l.n,cam.eyeN)<.22)continue;const p=cam.project(l.pos);if(l.kind==='sign'){
-  c.font='500 14px "Workshop", "Noto Sans KR", sans-serif';const width=c.measureText(l.text).width+18;c.fillStyle='#faf2df';c.fillRect(p.x-width/2,p.y-12,width,24);c.fillStyle='#49584a';c.textAlign='center';c.fillText(l.text,p.x,p.y+5);
+ // Score changes rise at the top middle of the view.
+ s.popups.forEach((q,i)=>{const age=s.time-q.born,y=175+i*16-age*40;
+  c.globalAlpha=Math.max(0,1-age/POPUP_LIFE);c.textAlign='center';c.font='700 46px "Workshop", "Noto Sans KR", sans-serif';
+  c.lineWidth=6;c.strokeStyle='#fdf7e9';c.strokeText(q.text,600,y);c.fillStyle=q.color;c.fillText(q.text,600,y);c.globalAlpha=1});
+ // Labels show only when they are in front of the eye.
+ for(const l of labels){const v=cam.view(l.pos);if(v.z<.3||dot(l.n,s.n)<SIGHT)continue;const p=cam.screen(v);if(l.kind==='sign'){
+  if(v.z>7)continue;c.font='500 14px "Workshop", "Noto Sans KR", sans-serif';const width=c.measureText(l.text).width+18;c.fillStyle='#faf2df';c.fillRect(p.x-width/2,p.y-12,width,24);c.fillStyle='#49584a';c.textAlign='center';c.fillText(l.text,p.x,p.y+5);
+ }else if(l.kind==='secret'){c.fillStyle='#7a3b3b';c.beginPath();c.arc(p.x,p.y,11,0,TAU);c.fill();c.fillStyle='#fff7e5';c.font='600 15px sans-serif';c.textAlign='center';c.fillText('!',p.x,p.y+5)
  }else if(l.id===s.target){const bounce=Math.sin(s.time*3)*3;c.fillStyle='#b5704f';c.beginPath();c.moveTo(p.x,p.y+13+bounce);c.lineTo(p.x-8,p.y-1+bounce);c.lineTo(p.x+8,p.y-1+bounce);c.fill();c.beginPath();c.arc(p.x,p.y-14+bounce,15,0,TAU);c.fill();c.fillStyle='#fff7e5';c.font='500 17px sans-serif';c.textAlign='center';c.fillText(l.id==='cafe'?'C':String(ORDERS.findIndex(o=>o.id===l.id)+1),p.x,p.y-8+bounce)}}
+ // Minimap: a small top-down disc around the player, turned so that forward is up.
+ {const mx=112,my=688,mr=88,range=A(3.4),ms=mr/range,toMap=q=>{if(dot(q,s.n)<Math.cos(range))return null;const d=sub(q,mul(s.n,dot(q,s.n)));return [mx+dot(d,east)*ms,my-dot(d,s.north)*ms]};
+  c.save();c.fillStyle='#f8f2e5ee';c.beginPath();c.arc(mx,my,mr,0,TAU);c.fill();c.clip();
+  c.fillStyle='#dfe3c8';c.beginPath();c.arc(mx,my,mr,0,TAU);c.fill();
+  for(const x of SITES){const m=toMap(x.n);if(!m)continue;const r=Math.max(x.w,x.d)/2/R*ms;c.fillStyle=x.id==='cafe'?'#b5704f':x.roof;c.fillRect(m[0]-r,m[1]-r,r*2,r*2)}
+  c.fillStyle=s.hidden?'#3f7a55':'#467f76';c.beginPath();c.moveTo(mx,my-9);c.lineTo(mx+6,my+6);c.lineTo(mx,my+3);c.lineTo(mx-6,my+6);c.closePath();c.fill();
+  c.restore();c.strokeStyle='#aabbb0';c.lineWidth=1.5;c.beginPath();c.arc(mx,my,mr,0,TAU);c.stroke();}
  c.textAlign='left';c.fillStyle='#3c5347';c.font='400 14px "Workshop", "Noto Sans KR", sans-serif';c.fillText('A LITTLE WORLD, A WARM CUP',42,44);c.font='500 37px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.locale==='ko'?'달동네 커피':'Neighborhood Coffee',40,95);c.font='400 15px "Workshop", "Noto Sans KR", sans-serif';c.fillStyle='#687763';c.fillText('서두르지 않아도 괜찮아요.',43,126);
- c.fillStyle='#f8f2e5';c.beginPath();c.roundRect(943,30,217,92,8);c.fill();c.fillStyle='#485a48';c.font='500 18px "Workshop", "Noto Sans KR", sans-serif';c.fillText('배달  '+s.done.length+' / 4',966,63);c.font='400 15px "Workshop", "Noto Sans KR", sans-serif';c.fillText('들고 있는 커피  '+s.carrying+'잔',966,96);
+ c.fillStyle='#f8f2e5';c.beginPath();c.roundRect(923,30,237,176,8);c.fill();c.fillStyle='#485a48';c.font='500 18px "Workshop", "Noto Sans KR", sans-serif';c.fillText('점수  '+s.score+' / '+WIN_SCORE,946,62);c.font='400 15px "Workshop", "Noto Sans KR", sans-serif';c.fillText('배달  '+s.done.length+' / 4  ·  '+s.round+'회차',946,90);c.fillText('들고 있는 커피  '+s.carrying+'잔',946,114);
+ c.fillStyle=s.contraband?'#7a3b3b':'#8a9282';c.fillText(s.contraband?'비밀 꾸러미 → '+(s.locale==='ko'?target(s).name:target(s).en):'비밀 꾸러미 없음',946,138);c.fillStyle=s.hidden?'#3f7a55':'#8a9282';c.fillText(s.hidden?'● 사람들 틈에 숨었어요':'○ 드러나 있어요',946,162);c.fillStyle='#687763';c.font='400 13px "Workshop", "Noto Sans KR", sans-serif';c.fillText('운반 성공 '+s.smuggled+'  ·  적발 '+s.caught,946,190);
  // A compass uses actual spherical tangents, including targets beyond the horizon.
  if(s.status!=='won'){
   const dest=target(s),delta=sub(dest.door,mul(s.n,dot(dest.door,s.n))),east=norm(cross(s.north,s.n));const a=Math.atan2(dot(delta,east),dot(delta,s.north));
-  c.save();c.translate(1065,188);c.fillStyle='#f8f2e5';c.beginPath();c.arc(0,0,38,0,TAU);c.fill();c.rotate(a);c.fillStyle='#b66f4f';c.beginPath();c.moveTo(0,-26);c.lineTo(11,12);c.lineTo(0,5);c.lineTo(-11,12);c.closePath();c.fill();c.restore();
-  c.fillStyle='#58664e';c.font='400 14px "Workshop", "Noto Sans KR", sans-serif';c.textAlign='center';c.fillText(s.locale==='ko'?dest.name:dest.en,1065,246);c.fillText(Math.round(angle(s.n,dest.door)*R*10)+' 걸음 거리',1065,269);
+  c.save();c.translate(1065,256);c.fillStyle='#f8f2e5';c.beginPath();c.arc(0,0,38,0,TAU);c.fill();c.rotate(a);c.fillStyle='#b66f4f';c.beginPath();c.moveTo(0,-26);c.lineTo(11,12);c.lineTo(0,5);c.lineTo(-11,12);c.closePath();c.fill();c.restore();
+  c.fillStyle='#58664e';c.font='400 14px "Workshop", "Noto Sans KR", sans-serif';c.textAlign='center';c.fillText(s.locale==='ko'?dest.name:dest.en,1065,314);c.fillText(Math.round(angle(s.n,dest.door)*R*10)+' 걸음 거리',1065,337);
  }
- const near=nearest(s);if(s.status==='playing'&&near){c.textAlign='center';c.fillStyle='#3f6151';c.beginPath();c.roundRect(362,716,476,42,21);c.fill();c.fillStyle='#fff8e7';c.font='400 17px "Workshop", "Noto Sans KR", sans-serif';c.fillText('E / Space  ·  '+(near.id==='cafe'?'커피 받기':s.done.includes(near.id)?'인사 나누기':'커피 전하기'),600,743)}
- c.textAlign='center';if(s.messageTime>0&&s.status==='playing'){c.fillStyle='#405a48';c.font='400 15px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.message,600,783)}
+ // An arrow points at the officer spotting you and fills as they recognise you.
+ if(s.status==='playing'&&s.detect>0&&s.spotter){const rel=sub(s.spotter.n,mul(s.n,dot(s.spotter.n,s.n))),a=Math.atan2(dot(rel,east),dot(rel,s.north)),k=s.detect;
+  c.save();c.translate(600,440);c.rotate(a);
+  const arrow=()=>{c.beginPath();c.moveTo(0,-124);c.lineTo(27,-74);c.lineTo(-27,-74);c.closePath()};
+  c.fillStyle='#fdf7e9d9';arrow();c.fill();
+  c.save();c.beginPath();c.rect(-30,-74-50*k,60,50*k);c.clip();c.fillStyle=k>=.99?'#a83226':'#d0584a';arrow();c.fill();c.restore();
+  c.strokeStyle='#7a3b3b';c.lineWidth=2.5;arrow();c.stroke();c.restore();
+  c.textAlign='center';c.fillStyle='#7a3b3b';c.font='500 15px "Workshop", "Noto Sans KR", sans-serif';c.fillText('발각까지  '+Math.round(k*100)+'%',600,398)}
+ const near=nearest(s);if(s.status==='playing'&&near){c.textAlign='center';c.fillStyle='#3f6151';c.beginPath();c.roundRect(400,26,400,42,21);c.fill();c.fillStyle='#fff8e7';c.font='400 17px "Workshop", "Noto Sans KR", sans-serif';c.fillText('E / Space  ·  '+(near.id==='cafe'?(s.carrying?'비밀 의뢰 묻기':'커피 받기'):s.done.includes(near.id)?'인사 나누기':'커피 전하기'),600,53)}
+ c.textAlign='center';if(s.messageTime>0&&s.status==='playing'){c.fillStyle='#405a48';c.font='400 15px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.message,600,96)}
  if(overlay&&s.status!=='playing'){
-  c.fillStyle='#f4ebdbe8';c.beginPath();c.roundRect(278,284,644,254,12);c.fill();c.fillStyle='#405a48';c.font='500 36px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.status==='ready'?'커피 한 잔의 작은 여행':s.status==='paused'?'잠깐 쉬어 가요':'오늘의 배달을 마쳤어요',600,347);
-  c.font='400 18px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.status==='won'?'네 잔의 커피, 네 이웃의 인사.':s.status==='paused'?'계속하기를 누르면 마을로 돌아갑니다.':'카페에서 네 잔을 받아, 이웃에게 전해 주세요.',600,394);
-  c.fillText('방향키 / WASD 이동  ·  E / Space 대화',600,436);c.fillStyle='#aa6e50';c.font='400 16px "Workshop", "Noto Sans KR", sans-serif';c.fillText('아래 '+(s.status==='won'?'다시 산책하기':s.status==='paused'?'계속하기':'산책 시작')+' 버튼',600,486);
+  c.fillStyle='#f4ebdbe8';c.beginPath();c.roundRect(278,284,644,296,12);c.fill();c.fillStyle='#405a48';c.font='500 36px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.status==='ready'?'커피 한 잔, 꾸러미 하나':s.status==='paused'?'잠깐 쉬어 가요':'오늘의 배달을 마쳤어요',600,347);
+  c.font='400 18px "Workshop", "Noto Sans KR", sans-serif';c.fillText(s.status==='won'?'최종 점수 '+s.score+'점  ·  운반 성공 '+s.smuggled+'  ·  적발 '+s.caught:s.status==='paused'?'계속하기를 누르면 마을로 돌아갑니다.':'커피만 +2점, 비밀 꾸러미까지 +5점 · '+WIN_SCORE+'점이면 끝.',600,394);
+  c.fillText('↑↓ / W S 걷기  ·  ←→ / A D 또는 드래그로 돌기  ·  E / Space 대화',600,436);c.fillStyle='#7a3b3b';c.font='400 16px "Workshop", "Noto Sans KR", sans-serif';c.fillText('시야에 들키면 화살표가 차오르고, 다 차면 붙잡혀 -10점',600,466);c.fillStyle='#3f7a55';c.fillText('행인 3명 이상 곁에 있으면 경찰이 알아보지 못해요',600,492);c.fillStyle='#aa6e50';c.fillText('아래 '+(s.status==='won'?'다시 산책하기':s.status==='paused'?'계속하기':'산책 시작')+' 버튼',600,540);
  }c.restore();
 }
 function mount(canvas,onUpdate=()=>{}){
@@ -159,10 +305,12 @@ function mount(canvas,onUpdate=()=>{}){
  const blur=()=>{keys.clear();pointer={x:0,y:0};if(s.status==='playing'){s.status='paused';onUpdate(s)}};
  const visibility=()=>{if(document.hidden)blur()};
  function loop(ms){if(!alive)return;const dt=last?(ms-last)/1000:0;last=ms;step(s,dt,{x:pointer.x+(keys.has('arrowright')||keys.has('d')?1:0)-(keys.has('arrowleft')||keys.has('a')?1:0),y:pointer.y+(keys.has('arrowdown')||keys.has('s')?1:0)-(keys.has('arrowup')||keys.has('w')?1:0)});draw(c,s);onUpdate(s);raf=requestAnimationFrame(loop)}
+ let dragging=false;const down=()=>{dragging=true},up=()=>{dragging=false},drag=e=>{if(dragging)look(s,(e.movementX||0)*.006)};
+ canvas.addEventListener('pointerdown',down);addEventListener('pointerup',up);addEventListener('pointermove',drag);
  addEventListener('keydown',keydown);addEventListener('keyup',keyup);addEventListener('blur',blur);document.addEventListener('visibilitychange',visibility);raf=requestAnimationFrame(loop);
- return {get state(){return s},start(){if(s.status==='won'){const l=s.locale;s=newGame();s.locale=l}start(s)},pause(){pause(s)},reset(){const l=s.locale;s=newGame();s.locale=l;keys.clear();pointer={x:0,y:0}},interact(){interact(s)},locale(l){s.locale=l==='ko'?'ko':'en'},target(id){chooseTarget(s,id)},pointer(x,y){pointer={x,y}},destroy(){alive=false;cancelAnimationFrame(raf);removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility)}};
+ return {get state(){return s},start(){if(s.status==='won'){const l=s.locale;s=newGame();s.locale=l}start(s)},pause(){pause(s)},reset(){const l=s.locale;s=newGame();s.locale=l;keys.clear();pointer={x:0,y:0}},interact(){interact(s)},locale(l){s.locale=l==='ko'?'ko':'en'},target(id){chooseTarget(s,id)},pointer(x,y){pointer={x,y}},destroy(){alive=false;cancelAnimationFrame(raf);canvas.removeEventListener('pointerdown',down);removeEventListener('pointerup',up);removeEventListener('pointermove',drag);removeEventListener('keydown',keydown);removeEventListener('keyup',keyup);removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility)}};
 }
-return {W,H,R,SITES,ORDERS,CAFE,newGame,start,pause,step,interact,nearest,target,chooseTarget,draw,mount,math:{add,sub,mul,dot,cross,len,norm,at,angle,frame},camera};
+return {W,H,R,SITES,ORDERS,CAFE,POINTS,WIN_SCORE,VIEW_HALF,VIEW_RANGE,HIDE_RADIUS,HIDE_COUNT,sees,walkers,isHidden,look,TREES,FLAT,pt,newGame,start,pause,step,interact,nearest,target,chooseTarget,draw,mount,math:{add,sub,mul,dot,cross,len,norm,at,angle,frame},camera};
 });
 
 const game=Daldongne.mount(document.querySelector("canvas"),()=>{});game.locale("en");document.querySelector("#start").onclick=()=>{game.start();document.querySelector("canvas").focus()};document.querySelector("#pause").onclick=()=>game.pause();document.querySelector("#reset").onclick=()=>game.reset();document.querySelector("#action").onclick=()=>game.interact();const held=new Map();function move(){let x=0,y=0;held.forEach(v=>{x+=v[0];y+=v[1]});game.pointer(x,y)}document.querySelectorAll('[data-dir]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);held.set(e.pointerId,b.dataset.dir.split(',').map(Number));move()};const stop=e=>{held.delete(e.pointerId);move()};b.onpointerup=stop;b.onpointercancel=stop;b.onlostpointercapture=stop});addEventListener('blur',()=>{held.clear();move()});</script></body></html>
